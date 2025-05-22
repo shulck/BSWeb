@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { eventService } from '../../services/EventService';
-import { Event, EventType, EventStatus } from '../../types/models';
+import { Event, EventType, EventStatus, EventTypeUtils } from '../../types/models';
 import { useAuth } from '../../hooks/useAuth';
+import ScheduleInput from './ScheduleInput';
 
 interface EventFormProps {
   event?: Event;
@@ -20,10 +21,9 @@ const EventForm: React.FC<EventFormProps> = ({
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   
-  // Form state
   const [formData, setFormData] = useState({
     title: '',
-    date: '',
+    date: formatDateForInput(initialDate || new Date()),
     type: EventType.CONCERT,
     status: EventStatus.BOOKED,
     location: '',
@@ -41,16 +41,13 @@ const EventForm: React.FC<EventFormProps> = ({
     currency: 'EUR',
     notes: '',
     setlistId: '',
+    isPersonal: false,
   });
 
-  // Schedule state
   const [schedule, setSchedule] = useState<string[]>([]);
-  const [newScheduleItem, setNewScheduleItem] = useState('');
 
-  // Initialize form
   useEffect(() => {
     if (event) {
-      // Edit mode
       setFormData({
         title: event.title,
         date: formatDateForInput(event.date),
@@ -71,31 +68,30 @@ const EventForm: React.FC<EventFormProps> = ({
         currency: event.currency || 'EUR',
         notes: event.notes || '',
         setlistId: event.setlistId || '',
+        isPersonal: event.isPersonal || false,
       });
       setSchedule(event.schedule || []);
-    } else if (initialDate) {
-      // Create mode with initial date
-      setFormData(prev => ({
-        ...prev,
-        date: formatDateForInput(initialDate)
-      }));
     }
-  }, [event, initialDate]);
+  }, [event]);
 
-  const formatDateForInput = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
+  function formatDateForInput(date: Date): string {
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
     return `${year}-${month}-${day}T${hours}:${minutes}`;
-  };
+  }
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
     }
   };
 
@@ -129,66 +125,73 @@ const EventForm: React.FC<EventFormProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateForm() || !currentUser?.groupId) return;
+    if (!validateForm() || !currentUser?.groupId) {
+      if (!currentUser?.groupId) {
+        setErrors({ general: 'Пользователь не привязан к группе' });
+      }
+      return;
+    }
 
     setLoading(true);
+    setErrors({});
 
     try {
-      const eventData: Omit<Event, 'id'> = {
+      const eventData: any = {
         title: formData.title.trim(),
         date: new Date(formData.date),
         type: formData.type,
         status: formData.status,
-        location: formData.location.trim() || undefined,
-        organizerName: formData.organizerName.trim() || undefined,
-        organizerEmail: formData.organizerEmail.trim() || undefined,
-        organizerPhone: formData.organizerPhone.trim() || undefined,
-        coordinatorName: formData.coordinatorName.trim() || undefined,
-        coordinatorEmail: formData.coordinatorEmail.trim() || undefined,
-        coordinatorPhone: formData.coordinatorPhone.trim() || undefined,
-        hotelName: formData.hotelName.trim() || undefined,
-        hotelAddress: formData.hotelAddress.trim() || undefined,
-        hotelCheckIn: formData.hotelCheckIn ? new Date(formData.hotelCheckIn) : undefined,
-        hotelCheckOut: formData.hotelCheckOut ? new Date(formData.hotelCheckOut) : undefined,
-        fee: formData.fee ? parseFloat(formData.fee) : undefined,
-        currency: formData.currency || undefined,
-        notes: formData.notes.trim() || undefined,
-        schedule: schedule.length > 0 ? schedule : undefined,
-        setlistId: formData.setlistId || undefined,
         groupId: currentUser.groupId,
-        isPersonal: false
+        isPersonal: formData.isPersonal
       };
+
+      if (formData.location.trim()) eventData.location = formData.location.trim();
+      if (formData.organizerName.trim()) eventData.organizerName = formData.organizerName.trim();
+      if (formData.organizerEmail.trim()) eventData.organizerEmail = formData.organizerEmail.trim();
+      if (formData.organizerPhone.trim()) eventData.organizerPhone = formData.organizerPhone.trim();
+      if (formData.coordinatorName.trim()) eventData.coordinatorName = formData.coordinatorName.trim();
+      if (formData.coordinatorEmail.trim()) eventData.coordinatorEmail = formData.coordinatorEmail.trim();
+      if (formData.coordinatorPhone.trim()) eventData.coordinatorPhone = formData.coordinatorPhone.trim();
+      if (formData.hotelName.trim()) eventData.hotelName = formData.hotelName.trim();
+      if (formData.hotelAddress.trim()) eventData.hotelAddress = formData.hotelAddress.trim();
+      if (formData.hotelCheckIn) eventData.hotelCheckIn = new Date(formData.hotelCheckIn);
+      if (formData.hotelCheckOut) eventData.hotelCheckOut = new Date(formData.hotelCheckOut);
+      if (formData.fee) {
+        eventData.fee = parseFloat(formData.fee);
+        eventData.currency = formData.currency || 'EUR';
+      }
+      if (formData.notes.trim()) eventData.notes = formData.notes.trim();
+      if (schedule.length > 0) eventData.schedule = schedule;
+      if (formData.setlistId) eventData.setlistId = formData.setlistId;
+
+      console.log('Saving event:', eventData);
 
       let success: boolean;
       
       if (event?.id) {
-        // Update existing event
         success = await eventService.updateEvent({ ...eventData, id: event.id });
       } else {
-        // Create new event
         success = await eventService.addEvent(eventData);
       }
 
       if (success) {
-        const savedEvent = event?.id 
-          ? { ...eventData, id: event.id } as Event
-          : { ...eventData, id: 'temp' } as Event; // Will be updated by subscription
-        
-        onSaved(savedEvent);
+        console.log('Event saved successfully');
+        onSaved(eventData as Event);
+        onClose();
       } else {
-        setErrors({ general: 'Не удалось сохранить событие' });
+        setErrors({ general: eventService.getLoadingState().errorMessage || 'Не удалось сохранить событие' });
       }
     } catch (error) {
+      console.error('Error saving event:', error);
       setErrors({ general: 'Произошла ошибка при сохранении' });
     } finally {
       setLoading(false);
     }
   };
 
-  const addScheduleItem = () => {
-    if (newScheduleItem.trim()) {
-      setSchedule(prev => [...prev, newScheduleItem.trim()]);
-      setNewScheduleItem('');
+  const handleOverlayClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      onClose();
     }
   };
 
@@ -205,23 +208,26 @@ const EventForm: React.FC<EventFormProps> = ({
     setSchedule(newSchedule);
   };
 
-  // Check if event type needs specific fields
-  const needsOrganizerInfo = [EventType.CONCERT, EventType.FESTIVAL].includes(formData.type);
+  const needsOrganizerInfo = [EventType.CONCERT, EventType.FESTIVAL, EventType.INTERVIEW, EventType.PHOTOSHOOT].includes(formData.type);
   const needsCoordinatorInfo = [EventType.CONCERT, EventType.FESTIVAL].includes(formData.type);
-  const needsHotelInfo = [EventType.CONCERT, EventType.FESTIVAL].includes(formData.type);
-  const needsFeeInfo = [EventType.CONCERT, EventType.FESTIVAL].includes(formData.type);
-  const needsSetlistInfo = [EventType.CONCERT, EventType.FESTIVAL, EventType.REHEARSAL].includes(formData.type);
+  const needsHotelInfo = [EventType.CONCERT, EventType.FESTIVAL, EventType.PHOTOSHOOT].includes(formData.type);
+  const needsFeeInfo = [EventType.CONCERT, EventType.FESTIVAL, EventType.INTERVIEW, EventType.PHOTOSHOOT].includes(formData.type);
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content large" onClick={e => e.stopPropagation()}>
+    <div className="modal-overlay-fixed" onClick={handleOverlayClick}>
+      <div className="modal-content-fixed large" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{event ? 'Редактировать событие' : 'Новое событие'}</h2>
-          <button className="modal-close" onClick={onClose}>×</button>
+          <button 
+            className="modal-close" 
+            onClick={onClose}
+            type="button"
+          >
+            ×
+          </button>
         </div>
 
         <form onSubmit={handleSubmit} className="event-form">
-          {/* Basic Information */}
           <div className="form-section">
             <h3>Основная информация</h3>
             
@@ -257,15 +263,13 @@ const EventForm: React.FC<EventFormProps> = ({
                 <label>Тип события</label>
                 <select
                   value={formData.type}
-                  onChange={(e) => handleInputChange('type', e.target.value)}
+                  onChange={(e) => handleInputChange('type', e.target.value as EventType)}
                 >
-                  <option value={EventType.CONCERT}>Концерт</option>
-                  <option value={EventType.FESTIVAL}>Фестиваль</option>
-                  <option value={EventType.REHEARSAL}>Репетиция</option>
-                  <option value={EventType.MEETING}>Встреча</option>
-                  <option value={EventType.INTERVIEW}>Интервью</option>
-                  <option value={EventType.PHOTOSHOOT}>Фотосессия</option>
-                  <option value={EventType.PERSONAL}>Личное</option>
+                  {Object.values(EventType).map(type => (
+                    <option key={type} value={type}>
+                      {EventTypeUtils.getDisplayName(type)}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -273,7 +277,7 @@ const EventForm: React.FC<EventFormProps> = ({
                 <label>Статус</label>
                 <select
                   value={formData.status}
-                  onChange={(e) => handleInputChange('status', e.target.value)}
+                  onChange={(e) => handleInputChange('status', e.target.value as EventStatus)}
                 >
                   <option value={EventStatus.BOOKED}>Забронировано</option>
                   <option value={EventStatus.CONFIRMED}>Подтверждено</option>
@@ -292,88 +296,65 @@ const EventForm: React.FC<EventFormProps> = ({
                 />
               </div>
             </div>
-          </div>
 
-          {/* Setlist Selection */}
-          {needsSetlistInfo && (
-            <div className="form-section">
-              <h3>Сетлист</h3>
-              <div className="form-group">
-                <label>Сетлист для события</label>
-                <select
-                  value={formData.setlistId}
-                  onChange={(e) => handleInputChange('setlistId', e.target.value)}
-                >
-                  <option value="">Не выбран</option>
-                  {/* TODO: Load setlists from SetlistService */}
-                </select>
+            <div className="form-row">
+              <div className="form-group checkbox-group">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={formData.isPersonal}
+                    onChange={(e) => handleInputChange('isPersonal', e.target.checked)}
+                  />
+                  <span>Личное событие</span>
+                </label>
               </div>
             </div>
-          )}
+          </div>
 
-          {/* Schedule */}
           <div className="form-section">
             <h3>Расписание дня</h3>
             
-            <div className="schedule-editor">
-              <div className="add-schedule-item">
-                <input
-                  type="text"
-                  value={newScheduleItem}
-                  onChange={(e) => setNewScheduleItem(e.target.value)}
-                  placeholder="Например: 10:00 - Звукопроверка"
-                  onKeyPress={(e) => e.key === 'Enter' && addScheduleItem()}
-                />
-                <button type="button" onClick={addScheduleItem}>
-                  Добавить
-                </button>
-              </div>
+            <ScheduleInput onAdd={(item) => setSchedule(prev => [...prev, item])} />
 
-              {schedule.length > 0 && (
-                <div className="schedule-items">
-                  {schedule.map((item, index) => (
-                    <div key={index} className="schedule-item">
-                      <span className="schedule-text">{item}</span>
-                      <div className="schedule-actions">
-                        {index > 0 && (
-                          <button 
-                            type="button"
-                            onClick={() => moveScheduleItem(index, index - 1)}
-                            title="Переместить вверх"
-                          >
-                            ↑
-                          </button>
-                        )}
-                        {index < schedule.length - 1 && (
-                          <button 
-                            type="button"
-                            onClick={() => moveScheduleItem(index, index + 1)}
-                            title="Переместить вниз"
-                          >
-                            ↓
-                          </button>
-                        )}
+            {schedule.length > 0 && (
+              <div className="schedule-items" style={{ marginTop: '16px' }}>
+                {schedule.map((item, index) => (
+                  <div key={index} className="schedule-item">
+                    <span className="schedule-text">{item}</span>
+                    <div className="schedule-actions">
+                      {index > 0 && (
                         <button 
                           type="button"
-                          onClick={() => removeScheduleItem(index)}
-                          className="delete-btn"
-                          title="Удалить"
+                          onClick={() => moveScheduleItem(index, index - 1)}
+                          title="Переместить вверх"
                         >
-                          ×
+                          ↑
                         </button>
-                      </div>
+                      )}
+                      {index < schedule.length - 1 && (
+                        <button 
+                          type="button"
+                          onClick={() => moveScheduleItem(index, index + 1)}
+                          title="Переместить вниз"
+                        >
+                          ↓
+                        </button>
+                      )}
+                      <button 
+                        type="button"
+                        onClick={() => removeScheduleItem(index)}
+                        className="delete-btn"
+                        title="Удалить"
+                      >
+                        ×
+                      </button>
                     </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="schedule-hint">
-                <small>💡 Для указания времени используйте формат «10:00 - Описание события»</small>
+                  </div>
+                ))}
               </div>
-            </div>
+            )}
           </div>
 
-          {/* Organizer Info */}
           {needsOrganizerInfo && (
             <div className="form-section">
               <h3>Организатор</h3>
@@ -416,7 +397,6 @@ const EventForm: React.FC<EventFormProps> = ({
             </div>
           )}
 
-          {/* Coordinator Info */}
           {needsCoordinatorInfo && (
             <div className="form-section">
               <h3>Координатор</h3>
@@ -459,7 +439,6 @@ const EventForm: React.FC<EventFormProps> = ({
             </div>
           )}
 
-          {/* Hotel Info */}
           {needsHotelInfo && (
             <div className="form-section">
               <h3>Проживание</h3>
@@ -512,7 +491,6 @@ const EventForm: React.FC<EventFormProps> = ({
             </div>
           )}
 
-          {/* Fee Info */}
           {needsFeeInfo && (
             <div className="form-section">
               <h3>Гонорар</h3>
@@ -546,7 +524,6 @@ const EventForm: React.FC<EventFormProps> = ({
             </div>
           )}
 
-          {/* Notes */}
           <div className="form-section">
             <h3>Заметки</h3>
             <div className="form-group">
@@ -559,7 +536,6 @@ const EventForm: React.FC<EventFormProps> = ({
             </div>
           </div>
 
-          {/* Form Actions */}
           <div className="form-actions">
             {errors.general && (
               <div className="error-message">{errors.general}</div>

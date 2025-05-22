@@ -274,7 +274,7 @@ export interface MapPointModel {
 
 // ============= UTILITY CLASSES =============
 
-// Event Type Colors (matching Swift exactly)
+// Event Type Colors and Icons (matching Swift exactly)
 export class EventTypeUtils {
   static getColorHex(type: EventType): string {
     switch (type) {
@@ -424,7 +424,7 @@ export class ValidationService {
 
  static validatePhone(phone: string): boolean {
    const trimmed = phone.trim();
-   const phoneRegex = /^[+]?[1-9][\d]{0,15}$/;
+   const phoneRegex = /^[+]?[0-9]{7,15}$/;
    return phoneRegex.test(trimmed);
  }
 }

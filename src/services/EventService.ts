@@ -70,6 +70,35 @@ export class EventService {
     };
   }
 
+  // Helper function to prepare data for Firestore
+  private prepareDataForFirestore(data: any): any {
+    const prepared: any = {};
+    
+    Object.keys(data).forEach(key => {
+      const value = data[key];
+      
+      // Skip undefined, null, empty strings, and empty arrays
+      if (value === undefined || value === null || 
+          (typeof value === 'string' && value.trim() === '') ||
+          (Array.isArray(value) && value.length === 0)) {
+        return;
+      }
+      
+      // Convert dates to Timestamps
+      if (value instanceof Date) {
+        prepared[key] = Timestamp.fromDate(value);
+      } else if (key === 'date' && typeof value === 'string') {
+        // Handle date strings
+        prepared[key] = Timestamp.fromDate(new Date(value));
+      } else {
+        prepared[key] = value;
+      }
+    });
+    
+    console.log('📋 Prepared data for Firestore:', prepared);
+    return prepared;
+  }
+
   async fetchEvents(groupId: string): Promise<Event[]> {
     console.log('🔍 Fetching events for group:', groupId);
     this.isLoading = true;
@@ -81,7 +110,6 @@ export class EventService {
     }
 
     try {
-      // Simplified query without ordering to avoid index requirement
       const q = query(
         collection(db, 'events'),
         where('groupId', '==', groupId)
@@ -97,9 +125,9 @@ export class EventService {
         return {
           ...data,
           id: doc.id,
-          date: data.date.toDate(),
-          hotelCheckIn: data.hotelCheckIn?.toDate(),
-          hotelCheckOut: data.hotelCheckOut?.toDate()
+          date: data.date?.toDate ? data.date.toDate() : new Date(data.date),
+          hotelCheckIn: data.hotelCheckIn?.toDate ? data.hotelCheckIn.toDate() : undefined,
+          hotelCheckOut: data.hotelCheckOut?.toDate ? data.hotelCheckOut.toDate() : undefined
         };
       }) as Event[];
 
@@ -134,19 +162,32 @@ export class EventService {
     }
 
     try {
-      const firestoreData = {
-        ...eventData,
-        date: Timestamp.fromDate(eventData.date),
-        hotelCheckIn: eventData.hotelCheckIn ? Timestamp.fromDate(eventData.hotelCheckIn) : null,
-        hotelCheckOut: eventData.hotelCheckOut ? Timestamp.fromDate(eventData.hotelCheckOut) : null
-      };
-
-      console.log('💾 Saving to Firestore:', firestoreData);
+      // Prepare data for Firestore
+      const firestoreData = this.prepareDataForFirestore(eventData);
+      
+      // Ensure required fields are present
+      if (!firestoreData.title || !firestoreData.date || !firestoreData.groupId) {
+        throw new Error('Missing required fields: title, date, or groupId');
+      }
+      
+      console.log('💾 Saving to Firestore with data:', firestoreData);
       const docRef = await addDoc(collection(db, 'events'), firestoreData);
       console.log('✅ Event saved with ID:', docRef.id);
 
-      // Refresh events immediately
-      await this.fetchEvents(eventData.groupId);
+      // Add the new event to local array immediately
+      const newEvent = {
+        ...eventData,
+        id: docRef.id
+      } as Event;
+      
+      this.events.push(newEvent);
+      this.events.sort((a, b) => a.date.getTime() - b.date.getTime());
+      this.notifyListeners();
+
+      // Also refresh from server to ensure consistency
+      setTimeout(() => {
+        this.fetchEvents(eventData.groupId);
+      }, 500);
       
       return true;
     } catch (error: any) {
@@ -159,7 +200,10 @@ export class EventService {
   }
 
   async updateEvent(event: Event): Promise<boolean> {
-    if (!event.id) return false;
+    if (!event.id) {
+      console.error('❌ Cannot update event without ID');
+      return false;
+    }
 
     this.isLoading = true;
     this.errorMessage = null;
@@ -171,16 +215,32 @@ export class EventService {
     }
 
     try {
-      await updateDoc(doc(db, 'events', event.id), {
-        ...event,
-        date: Timestamp.fromDate(event.date),
-        hotelCheckIn: event.hotelCheckIn ? Timestamp.fromDate(event.hotelCheckIn) : null,
-        hotelCheckOut: event.hotelCheckOut ? Timestamp.fromDate(event.hotelCheckOut) : null
-      });
+      // Remove id from update data
+      const { id, ...updateData } = event;
+      
+      // Prepare data for Firestore
+      const firestoreData = this.prepareDataForFirestore(updateData);
 
-      await this.fetchEvents(event.groupId);
+      console.log('📝 Updating event:', id, firestoreData);
+      await updateDoc(doc(db, 'events', id), firestoreData);
+      console.log('✅ Event updated successfully');
+
+      // Update local array immediately
+      const index = this.events.findIndex(e => e.id === id);
+      if (index !== -1) {
+        this.events[index] = event;
+        this.events.sort((a, b) => a.date.getTime() - b.date.getTime());
+        this.notifyListeners();
+      }
+
+      // Also refresh from server
+      setTimeout(() => {
+        this.fetchEvents(event.groupId);
+      }, 500);
+
       return true;
     } catch (error: any) {
+      console.error('❌ Error updating event:', error);
       this.errorMessage = `Error updating event: ${error.message}`;
       return false;
     } finally {
@@ -202,9 +262,14 @@ export class EventService {
 
     try {
       await deleteDoc(doc(db, 'events', event.id));
-      await this.fetchEvents(event.groupId);
+      
+      // Remove from local array immediately
+      this.events = this.events.filter(e => e.id !== event.id);
+      this.notifyListeners();
+      
       return true;
     } catch (error: any) {
+      console.error('❌ Error deleting event:', error);
       this.errorMessage = `Error deleting event: ${error.message}`;
       return false;
     } finally {
@@ -215,12 +280,14 @@ export class EventService {
   // Cache methods
   private saveToCache(groupId: string, events: Event[]) {
     try {
-      localStorage.setItem(`events_${groupId}`, JSON.stringify(events.map(event => ({
+      const cacheData = events.map(event => ({
         ...event,
         date: event.date.toISOString(),
         hotelCheckIn: event.hotelCheckIn?.toISOString(),
         hotelCheckOut: event.hotelCheckOut?.toISOString()
-      }))));
+      }));
+      
+      localStorage.setItem(`events_${groupId}`, JSON.stringify(cacheData));
       console.log('💾 Events saved to cache');
     } catch (error) {
       console.warn('⚠️ Failed to save events to cache:', error);

@@ -1,0 +1,46 @@
+          {/* Schedule */}
+          <div className="form-section">
+            <h3>Расписание дня</h3>
+            
+            <div className="schedule-editor">
+              <ScheduleInput onAdd={(item) => setSchedule(prev => [...prev, item])} />
+
+              {schedule.length > 0 && (
+                <div className="schedule-items" style={{ marginTop: '16px' }}>
+                  {schedule.map((item, index) => (
+                    <div key={index} className="schedule-item">
+                      <span className="schedule-text">{item}</span>
+                      <div className="schedule-actions">
+                        {index > 0 && (
+                          <button 
+                            type="button"
+                            onClick={() => moveScheduleItem(index, index - 1)}
+                            title="Переместить вверх"
+                          >
+                            ↑
+                          </button>
+                        )}
+                        {index < schedule.length - 1 && (
+                          <button 
+                            type="button"
+                            onClick={() => moveScheduleItem(index, index + 1)}
+                            title="Переместить вниз"
+                          >
+                            ↓
+                          </button>
+                        )}
+                        <button 
+                          type="button"
+                          onClick={() => removeScheduleItem(index)}
+                          className="delete-btn"
+                          title="Удалить"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
