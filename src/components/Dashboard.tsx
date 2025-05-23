@@ -4,6 +4,8 @@ import { useAppState } from '../hooks/useAppState';
 import { GroupService, TaskService, SetlistService } from '../services/firestore';
 import { GroupModel, TaskModel, Setlist, ModuleType, Song } from '../types/models';
 import Calendar from './Events/Calendar';
+import TaskForm from './Tasks/TaskForm';
+import TaskDetail from './Tasks/TaskDetail';
 
 const Dashboard: React.FC = () => {
   const { currentUser, logout } = useAuth();
@@ -14,6 +16,11 @@ const Dashboard: React.FC = () => {
   const [tasks, setTasks] = useState<TaskModel[]>([]);
   const [setlists, setSetlists] = useState<Setlist[]>([]);
   const [loading, setLocalLoading] = useState(true);
+
+  // Tasks specific states
+  const [showTaskForm, setShowTaskForm] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<TaskModel | null>(null);
+  const [taskFilter, setTaskFilter] = useState<'all' | 'my' | 'completed'>('all');
 
   // Group joining
   const [showJoinForm, setShowJoinForm] = useState(false);
@@ -27,9 +34,7 @@ const Dashboard: React.FC = () => {
       const userGroups = await GroupService.getUserGroups(currentUser.id);
       setGroups(userGroups);
       
-      // Set current group - only if user has groups
       if (userGroups.length > 0) {
-        // If user has groupId, find that specific group
         if (currentUser.groupId) {
           const userGroup = userGroups.find(g => g.id === currentUser.groupId);
           setCurrentGroup(userGroup || userGroups[0]);
@@ -51,16 +56,13 @@ const Dashboard: React.FC = () => {
     if (!currentGroup) return;
 
     try {
-      // Subscribe to real-time tasks updates (like iOS)
       const unsubscribeFromTasks = TaskService.subscribeToTasks(currentGroup.id!, (updatedTasks) => {
         setTasks(updatedTasks);
       });
 
-      // Load setlists
       const groupSetlists = await SetlistService.getGroupSetlists(currentGroup.id!);
       setSetlists(groupSetlists);
 
-      // Return cleanup function
       return () => {
         unsubscribeFromTasks();
       };
@@ -93,11 +95,20 @@ const Dashboard: React.FC = () => {
   const toggleTask = async (task: TaskModel) => {
     try {
       await TaskService.toggleCompletion(task);
-      // Task will be updated automatically via real-time subscription
     } catch (error) {
       console.error('Error updating task:', error);
     }
   };
+
+  const filteredTasks = tasks.filter(task => {
+    if (taskFilter === 'my') {
+      return task.assignedTo === currentUser?.id && !task.completed;
+    } else if (taskFilter === 'completed') {
+      return task.completed;
+    } else {
+      return !task.completed;
+    }
+  });
 
   if (loading) {
     return <div className="loading">Загрузка...</div>;
@@ -112,12 +123,10 @@ const Dashboard: React.FC = () => {
         </div>
       </header>
 
-      {/* Group Selector - Only show if user has groups */}
       {currentGroup ? (
         <div className="group-selector">
           <div className="current-group">
             <h3>Группа: {currentGroup.name}</h3>
-            {/* Only show dropdown if user has multiple groups */}
             {groups.length > 1 && (
               <select
                 value={currentGroup.id || ''}
@@ -135,7 +144,6 @@ const Dashboard: React.FC = () => {
             )}
           </div>
 
-          {/* Join another group button */}
           {!showJoinForm ? (
             <button onClick={() => setShowJoinForm(true)}>
               Присоединиться к другой группе
@@ -157,7 +165,6 @@ const Dashboard: React.FC = () => {
           )}
         </div>
       ) : (
-        // Show join form if user has no groups
         <div className="group-selector no-groups">
           <div className="no-groups-message">
             <h3>У вас нет активных групп</h3>
@@ -190,7 +197,6 @@ const Dashboard: React.FC = () => {
 
       {currentGroup && (
         <>
-          {/* Navigation */}
           <nav className="main-navigation">
             <div className="nav-items">
               {hasAccess(ModuleType.CALENDAR) && (
@@ -223,7 +229,6 @@ const Dashboard: React.FC = () => {
             </button>
           </nav>
 
-          {/* Main Content */}
           <main className="main-content">
             {currentView === 'events' && (
               <div className="events-view">
@@ -236,50 +241,71 @@ const Dashboard: React.FC = () => {
                 <div className="section-header">
                   <h2>Задачи группы {currentGroup.name}</h2>
                   {hasEditPermission(ModuleType.TASKS) && (
-                    <button className="add-btn">+ Добавить задачу</button>
+                    <button className="add-btn" onClick={() => setShowTaskForm(true)}>
+                      + Добавить задачу
+                    </button>
                   )}
                 </div>
-                
-                <div className="tasks-grid">
-                  <div className="tasks-column">
-                    <h3>Мои задачи</h3>
-                    {tasks
-                      .filter(task => task.assignedTo === currentUser?.id)
-                      .map(task => (
-                        <div key={task.id} className={`task-card ${task.completed ? 'completed' : ''}`}>
-                          <div className="task-header">
-                            <input
-                              type="checkbox"
-                              checked={task.completed}
-                              onChange={() => toggleTask(task)}
-                            />
-                            <h4>{task.title}</h4>
-                            <span className="due-date">
-                              📅 {task.dueDate.toLocaleDateString('ru-RU')}
-                            </span>
-                          </div>
-                          <p>{task.description}</p>
-                        </div>
-                      ))}
-                  </div>
 
-                  <div className="tasks-column">
-                    <h3>Другие задачи</h3>
-                    {tasks
-                      .filter(task => task.assignedTo !== currentUser?.id)
-                      .map(task => (
-                        <div key={task.id} className={`task-card ${task.completed ? 'completed' : ''}`}>
-                          <div className="task-header">
-                            <h4>{task.title}</h4>
-                            <span className="due-date">
-                              📅 {task.dueDate.toLocaleDateString('ru-RU')}
-                            </span>
-                          </div>
-                          <p>{task.description}</p>
-                          <small>Назначено: {task.assignedTo}</small>
+                <div className="task-filters">
+                  <button
+                    className={`filter-btn ${taskFilter === 'all' ? 'active' : ''}`}
+                    onClick={() => setTaskFilter('all')}
+                  >
+                    Все активные
+                  </button>
+                  <button
+                    className={`filter-btn ${taskFilter === 'my' ? 'active' : ''}`}
+                    onClick={() => setTaskFilter('my')}
+                  >
+                    Мои задачи
+                  </button>
+                  <button
+                    className={`filter-btn ${taskFilter === 'completed' ? 'active' : ''}`}
+                    onClick={() => setTaskFilter('completed')}
+                  >
+                    Выполненные
+                  </button>
+                </div>
+                
+                <div className="tasks-list">
+                  {filteredTasks.length === 0 ? (
+                    <div className="empty-state">
+                      <p>Нет задач</p>
+                      {hasEditPermission(ModuleType.TASKS) && taskFilter === 'all' && (
+                        <button onClick={() => setShowTaskForm(true)}>
+                          Создать первую задачу
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    filteredTasks.map(task => (
+                      <div 
+                        key={task.id} 
+                        className={`task-card ${task.completed ? 'completed' : ''}`}
+                        onClick={() => setSelectedTask(task)}
+                      >
+                        <div className="task-header">
+                          <input
+                            type="checkbox"
+                            checked={task.completed}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              toggleTask(task);
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                          <h4>{task.title}</h4>
+                          <span className={`due-date ${!task.completed && new Date(task.dueDate) < new Date() ? 'overdue' : ''}`}>
+                            📅 {new Date(task.dueDate).toLocaleDateString('ru-RU')}
+                          </span>
                         </div>
-                      ))}
-                  </div>
+                        {task.description && (
+                          <p className="task-description">{task.description}</p>
+                        )}
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             )}
@@ -327,6 +353,21 @@ const Dashboard: React.FC = () => {
             )}
           </main>
         </>
+      )}
+
+      {showTaskForm && (
+        <TaskForm
+          onClose={() => setShowTaskForm(false)}
+          onSaved={() => setShowTaskForm(false)}
+        />
+      )}
+
+      {selectedTask && (
+        <TaskDetail
+          task={selectedTask}
+          onClose={() => setSelectedTask(null)}
+          onUpdated={() => setSelectedTask(null)}
+        />
       )}
     </div>
   );

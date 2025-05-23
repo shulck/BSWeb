@@ -506,3 +506,26 @@ export class FinanceUtils {
    return records.filter(record => record.date >= start && record.date <= end);
  }
 }
+
+// Task Priority
+export enum TaskPriority {
+  HIGH = 'High',
+  MEDIUM = 'Medium',
+  LOW = 'Low'
+}
+
+// Extend TaskModel
+export interface TaskModel {
+  id?: string;
+  title: string;
+  description: string;
+  assignedTo: string;
+  dueDate: Date;
+  completed: boolean;
+  groupId: string;
+  priority?: TaskPriority;
+  tags?: string[];
+  createdAt?: Date;
+  createdBy?: string;
+  completedAt?: Date;
+}
