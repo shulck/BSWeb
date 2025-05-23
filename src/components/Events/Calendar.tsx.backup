@@ -222,7 +222,7 @@ const Calendar: React.FC<CalendarProps> = ({ onEventClick }) => {
                   {dateValue.day !== -1 && (
                     <>
                       <div className="date-header-compact">
-                        <span className="date-number-compact">{dateValue.day}</span>
+                        <span className="date-number-compact">{dateValue.day}</div>
                         {allEvents.length > 1 && (
                           <div className="event-count-compact">+{allEvents.length - 1}</div>
                         )}
@@ -230,7 +230,7 @@ const Calendar: React.FC<CalendarProps> = ({ onEventClick }) => {
                       
                       {primaryEvent && (
                         <div className="event-preview">
-                          <span className="event-icon-mini">{EventTypeUtils.getIcon(primaryEvent.type)}</span>
+                          <span className="event-icon-mini">{EventTypeUtils.getIcon(primaryEvent.type)}</div>
                           <div className="event-text">
                             <div className="event-title-mini">
                               {primaryEvent.title.length > 10 
@@ -287,7 +287,7 @@ const Calendar: React.FC<CalendarProps> = ({ onEventClick }) => {
                     className="event-dot"
                     style={{ backgroundColor: EventTypeUtils.getColorHex(event.type) }}
                   />
-                  <span className="event-type-mini">{EventTypeUtils.getDisplayName(event.type)}</span>
+                  <span className="event-type-mini">{EventTypeUtils.getDisplayName(event.type)}</div>
                 </div>
                 
                 <h4 className="event-title-compact">{event.title}</h4>
@@ -298,17 +298,17 @@ const Calendar: React.FC<CalendarProps> = ({ onEventClick }) => {
                       hour: '2-digit', 
                       minute: '2-digit' 
                     })}
-                  </span>
+                  </div>
                   {event.location && (
                     <span className="event-location-compact">
                       📍 {event.location.length > 20 ? event.location.substring(0, 20) + '...' : event.location}
-                    </span>
+                    </div>
                   )}
                 </div>
                 
                 <span className={`event-status-compact status-${event.status.toLowerCase()}`}>
                   {event.status}
-                </span>
+                </div>
               </div>
             ))}
           </div>

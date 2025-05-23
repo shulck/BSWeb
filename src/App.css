@@ -2123,3 +2123,207 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* Additional contact styles */
+.additional-contact-item {
+  position: relative;
+  padding: 16px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.additional-contact-item .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr 1fr auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.remove-contact-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: #fee2e2;
+  color: #dc2626;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  transition: all 0.2s ease;
+  margin-bottom: 8px;
+}
+
+.remove-contact-btn:hover {
+  background: #fecaca;
+  color: #b91c1c;
+}
+
+.add-contact-btn {
+  background: #f0f9ff;
+  border: 1px dashed #3b82f6;
+  color: #3b82f6;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+  margin-top: 12px;
+}
+
+.add-contact-btn:hover {
+  background: #dbeafe;
+  border-style: solid;
+}
+
+@media (max-width: 768px) {
+  .additional-contact-item .form-row {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .remove-contact-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+  }
+}
+
+/* Override event count styles */
+.date-header-compact .event-count-compact {
+  background: #fbbf24 !important;
+  color: #1f2937 !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  padding: 2px 6px !important;
+  border-radius: 10px !important;
+  min-width: 16px !important;
+  display: inline-block !important;
+  line-height: 1.2 !important;
+}
+
+.calendar-date-compact.selected .date-header-compact .event-count-compact {
+  background: #fef3c7 !important;
+  color: #92400e !important;
+}
+
+/* Hide empty event count */
+.sidebar-header-compact .event-count-compact:empty {
+  display: none;
+}
+
+/* Better no events state */
+.no-events-compact {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.no-events-compact p {
+  margin: 0 0 24px 0;
+  color: #6b7280;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.no-events-compact .add-btn-small-compact {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 14px 28px;
+  border-radius: 30px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 15px;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.no-events-compact .add-btn-small-compact:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+}
+
+/* Beautiful empty state */
+.no-events-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.no-events-icon {
+  font-size: 48px;
+  opacity: 0.5;
+}
+
+.no-events-compact {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 24px;
+  text-align: center;
+  background: linear-gradient(135deg, #f8fafc 0%, #f3f4f6 100%);
+  border-radius: 16px;
+  margin: 16px;
+}
+
+.no-events-compact p {
+  margin: 0 0 28px 0;
+  color: #6b7280;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+/* Hide sidebar header event count when 0 */
+.sidebar-header-compact {
+  padding: 24px;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  min-height: 80px;
+}
+
+.sidebar-header-compact h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #1f2937;
+  line-height: 1.4;
+}
+
+.sidebar-header-compact {
+ padding: 24px;
+ background: white;
+ border-bottom: 1px solid #e5e7eb;
+}
+
+.sidebar-header-compact h3 {
+ margin: 0 0 12px 0;
+ font-size: 1.2rem;
+ font-weight: 700;
+ color: #1f2937;
+ line-height: 1.4;
+}
+
+.sidebar-header-compact .event-count-compact {
+ font-size: 16px;
+ color: #374151;
+ font-weight: 600;
+ display: block;
+ margin-top: 8px;
+ background: #f3f4f6;
+ padding: 8px 16px;
+ border-radius: 8px;
+ text-align: center;
+}
